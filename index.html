@@ -32,9 +32,10 @@
     const protocol = new pmtiles.Protocol();
     maplibregl.addProtocol("pmtiles", protocol.tile);
 
-    // Supabase PMTiles URL
-    const PMTILES_URL = "pmtiles://https://lvyaxudmgssqyxqmlyln.supabase.co/storage/v1/object/public/basemap/Rome_basemap.pmtiles";
-    const sourceId = "rome";
+    // Cloudflare R2 PMTiles URL
+const PMTILES_URL = "pmtiles://https://maps.greenspaces.cloud/Rome/Rome_basemap.pmtiles";
+const sourceId = "rome";
+
 
     // MapLibre style with Protomaps basemap layers
     const style = {
