@@ -9,8 +9,8 @@
     html, body, #map { height: 100%; margin: 0; padding: 0; }
     .maplibregl-ctrl-attrib { font-size: 12px; }
     .toggle-box {
-      position: absolute; top: 10px; left: 10px; z-index: 1;
-      background: #fff; padding: 6px 8px; border-radius: 6px; font: 14px system-ui, sans-serif;
+      position:absolute; top:10px; left:10px; z-index:1;
+      background:#fff; padding:6px 8px; border-radius:6px; font:14px system-ui, sans-serif;
       box-shadow: 0 2px 8px rgba(0,0,0,.12);
     }
   </style>
@@ -28,42 +28,37 @@
   <script src="./vendor/basemaps.js"></script>
 
   <script>
-    // --- PMTiles protocol ---
+    // PMTiles protocol
     const protocol = new pmtiles.Protocol();
     maplibregl.addProtocol("pmtiles", protocol.tile);
 
-    // Remote PMTiles archives (no local download)
-    const GLOBAL_BASEMAP_RAW = "https://build.protomaps.com/20251009.pmtiles"; // daily global vector basemap
+    // Remote PMTiles archives
+    const GLOBAL_BASEMAP_RAW = "https://build.protomaps.com/20251009.pmtiles"; // daily global basemap
     const NAPLES_ORTHO_RAW   = "https://maps.greenspaces.cloud/Naples/part_of_napoli_orthophoto.pmtiles"; // your raster
 
-    // Explicitly register archives (helps some setups)
+    // Register archives (defensive)
     protocol.add(new pmtiles.PMTiles(GLOBAL_BASEMAP_RAW));
     protocol.add(new pmtiles.PMTiles(NAPLES_ORTHO_RAW));
 
     const basemapSourceId = "basemap";
 
-    // --- Style with Protomaps layers ---
+    // Style: use Protomaps layers directly (they include a background layer)
     const style = {
       version: 8,
       glyphs: "https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf",
-      // v5 sprite matches basemaps.js 5.x
       sprite: "https://protomaps.github.io/basemaps-assets/sprites/v5/light",
       sources: {
         [basemapSourceId]: {
           type: "vector",
           url: "pmtiles://" + GLOBAL_BASEMAP_RAW,
-          attribution: '<a href="https://protomaps.com">Protomaps</a> © <a href="https://openstreetmap.org">OpenStreetMap</a>'
+          attribution:
+            '<a href="https://protomaps.com">Protomaps</a> © <a href="https://openstreetmap.org">OpenStreetMap</a>'
         }
       },
-      layers: [
-        // Neutral background to avoid black
-        { id: "background", type: "background", paint: { "background-color": "#f2f2f2" } },
-        // Protomaps basemap layers (labels, roads, etc.)
-        ...basemaps.layers(basemapSourceId, basemaps.namedFlavor("light"), { lang: "en" })
-      ]
+      layers: basemaps.layers(basemapSourceId, basemaps.namedFlavor("light"), { lang: "en" })
     };
 
-    // --- Init MapLibre ---
+    // Init map
     const map = new maplibregl.Map({
       container: "map",
       style,
@@ -76,10 +71,9 @@
     map.addControl(new maplibregl.ScaleControl({ unit: "metric" }));
     map.addControl(new maplibregl.AttributionControl({ compact: true }));
 
-    // Helpful error logging
     map.on("error", (e) => console.error("Map error:", e?.error || e));
 
-    // Find first symbol layer so the orthophoto sits beneath labels
+    // Find first symbol layer so orthophoto is below labels
     function firstSymbolLayerId() {
       const layers = map.getStyle().layers || [];
       for (const l of layers) if (l.type === "symbol") return l.id;
@@ -94,26 +88,16 @@
         tileSize: 512,
         attribution: "© Company Orthophoto"
       });
-
       const beforeId = firstSymbolLayerId();
       map.addLayer(
         { id: "naples-ortho", type: "raster", source: "naples-ortho", minzoom: 0, maxzoom: 22 },
-        beforeId // insert below first label layer
+        beforeId
       );
 
-      // Toggle visibility
+      // Toggle
       document.getElementById("orthoToggle").onchange = (e) => {
         map.setLayoutProperty("naples-ortho", "visibility", e.target.checked ? "visible" : "none");
       };
-    });
-
-    // Optional: quick feature inspector for vector basemap
-    map.on("click", (e) => {
-      const features = map.queryRenderedFeatures(e.point);
-      if (!features?.length) return;
-      const props = Object.entries(features[0].properties || {})
-        .map(([k,v]) => `<div><strong>${k}</strong>: ${String(v)}</div>`).join("");
-      new maplibregl.Popup().setLngLat(e.lngLat).setHTML(props || "No properties").addTo(map);
     });
   </script>
 </body>
