@@ -72,15 +72,21 @@
     const map = new maplibregl.Map({
       container: "map",
       style,
-      center: [14.2681, 40.8518], // temporary; we'll auto-fit to orthophoto
+      // Temporary values; we'll auto-fit to the orthophoto bounds below.
+      center: [14.2681, 40.8518],
       zoom: 12,
-      hash: true
+      // Disable hash so old URL hashes don't override our auto-centering.
+      hash: false
     });
 
     // Controls
     map.addControl(new maplibregl.NavigationControl(), "top-right");
     map.addControl(new maplibregl.ScaleControl({ unit: "metric" }));
-    map.addControl(new maplibregl.AttributionControl({ compact: true }));
+    // Add custom © R3GIS attribution
+    map.addControl(new maplibregl.AttributionControl({
+      compact: true,
+      customAttribution: "© R3GIS"
+    }));
 
     // Helpful error logging
     map.on("error", (e) => console.error("Map error:", e?.error || e));
@@ -99,7 +105,6 @@
         const header = await pmt.getHeader();
         if (header?.bounds) {
           const [w, s, e, n] = header.bounds;
-          // Guard against invalid bounds
           if (isFinite(w) && isFinite(s) && isFinite(e) && isFinite(n) && w < e && s < n) {
             map.fitBounds([[w, s], [e, n]], { padding: 24, maxZoom: 19 });
           }
@@ -115,7 +120,8 @@
         type: "raster",
         url: "pmtiles://" + ORTHO_RAW,
         tileSize: 512,
-        attribution: "© Company Orthophoto"
+        // Replace (c) Company with R3GIS
+        attribution: "© R3GIS"
       });
 
       const beforeId = firstSymbolLayerId();
@@ -135,9 +141,6 @@
       document.getElementById("orthoToggle").onchange = (e) => {
         map.setLayoutProperty("naples-ortho", "visibility", e.target.checked ? "visible" : "none");
       };
-
-      // Button: zoom to orthophoto
-      document.getElementById("zoomToOrtho").onclick = fitToOrthoBounds;
 
       // Auto-fit on first load
       await fitToOrthoBounds();
