@@ -4,23 +4,19 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Naples Orthophoto + Protomaps + MapLibre</title>
-
-  <!-- Local MapLibre CSS -->
   <link href="./vendor/maplibre-gl.css" rel="stylesheet" />
-
   <style>
     html, body, #map { height: 100%; margin: 0; padding: 0; }
     .maplibregl-ctrl-attrib { font-size: 12px; }
     .toggle-box {
       position: absolute; top: 10px; left: 10px; z-index: 1;
       background: #fff; padding: 6px 8px; border-radius: 6px; font: 14px system-ui, sans-serif;
+      box-shadow: 0 2px 8px rgba(0,0,0,.12);
     }
   </style>
 </head>
 <body>
   <div id="map"></div>
-
-  <!-- Toggle control -->
   <div class="toggle-box">
     <input id="orthoToggle" type="checkbox" checked />
     <label for="orthoToggle">Orthophoto</label>
@@ -32,29 +28,42 @@
   <script src="./vendor/basemaps.js"></script>
 
   <script>
-    // Register pmtiles:// protocol
+    // --- PMTiles protocol ---
     const protocol = new pmtiles.Protocol();
     maplibregl.addProtocol("pmtiles", protocol.tile);
 
-    // Global Protomaps basemap (vector PMTiles)
-    const BASEMAP_PM = "pmtiles://https://pmtiles.protomaps.com/20240401.pmtiles";
+    // Remote PMTiles archives (no local download)
+    const GLOBAL_BASEMAP_RAW = "https://build.protomaps.com/20251009.pmtiles"; // daily global vector basemap
+    const NAPLES_ORTHO_RAW   = "https://maps.greenspaces.cloud/Naples/part_of_napoli_orthophoto.pmtiles"; // your raster
+
+    // Explicitly register archives (helps some setups)
+    protocol.add(new pmtiles.PMTiles(GLOBAL_BASEMAP_RAW));
+    protocol.add(new pmtiles.PMTiles(NAPLES_ORTHO_RAW));
+
     const basemapSourceId = "basemap";
 
+    // --- Style with Protomaps layers ---
     const style = {
       version: 8,
       glyphs: "https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf",
-      sprite: "https://protomaps.github.io/basemaps-assets/sprites/v4/light",
+      // v5 sprite matches basemaps.js 5.x
+      sprite: "https://protomaps.github.io/basemaps-assets/sprites/v5/light",
       sources: {
         [basemapSourceId]: {
           type: "vector",
-          url: BASEMAP_PM,
+          url: "pmtiles://" + GLOBAL_BASEMAP_RAW,
           attribution: '<a href="https://protomaps.com">Protomaps</a> © <a href="https://openstreetmap.org">OpenStreetMap</a>'
         }
       },
-      layers: basemaps.layers(basemapSourceId, basemaps.namedFlavor("light"), { lang: "en" })
+      layers: [
+        // Neutral background to avoid black
+        { id: "background", type: "background", paint: { "background-color": "#f2f2f2" } },
+        // Protomaps basemap layers (labels, roads, etc.)
+        ...basemaps.layers(basemapSourceId, basemaps.namedFlavor("light"), { lang: "en" })
+      ]
     };
 
-    // Initialize MapLibre
+    // --- Init MapLibre ---
     const map = new maplibregl.Map({
       container: "map",
       style,
@@ -63,12 +72,14 @@
       hash: true
     });
 
-    // Controls
     map.addControl(new maplibregl.NavigationControl(), "top-right");
     map.addControl(new maplibregl.ScaleControl({ unit: "metric" }));
     map.addControl(new maplibregl.AttributionControl({ compact: true }));
 
-    // Helper: insert orthophoto beneath labels
+    // Helpful error logging
+    map.on("error", (e) => console.error("Map error:", e?.error || e));
+
+    // Find first symbol layer so the orthophoto sits beneath labels
     function firstSymbolLayerId() {
       const layers = map.getStyle().layers || [];
       for (const l of layers) if (l.type === "symbol") return l.id;
@@ -76,10 +87,10 @@
     }
 
     map.on("load", () => {
-      // Naples orthophoto raster PMTiles (your file on Cloudflare)
+      // Raster orthophoto (PMTiles)
       map.addSource("naples-ortho", {
         type: "raster",
-        url: "pmtiles://https://maps.greenspaces.cloud/Naples/part_of_napoli_orthophoto.pmtiles",
+        url: "pmtiles://" + NAPLES_ORTHO_RAW,
         tileSize: 512,
         attribution: "© Company Orthophoto"
       });
@@ -87,7 +98,7 @@
       const beforeId = firstSymbolLayerId();
       map.addLayer(
         { id: "naples-ortho", type: "raster", source: "naples-ortho", minzoom: 0, maxzoom: 22 },
-        beforeId
+        beforeId // insert below first label layer
       );
 
       // Toggle visibility
@@ -96,17 +107,13 @@
       };
     });
 
-    // Optional: click to inspect vector features
-    map.on("error", (e) => console.error("Map error:", e && e.error ? e.error : e));
+    // Optional: quick feature inspector for vector basemap
     map.on("click", (e) => {
       const features = map.queryRenderedFeatures(e.point);
-      if (features && features.length) {
-        const f = features[0];
-        const props = Object.entries(f.properties || {})
-          .map(([k, v]) => `<div><strong>${k}</strong>: ${String(v)}</div>`)
-          .join("");
-        new maplibregl.Popup().setLngLat(e.lngLat).setHTML(props || "No properties").addTo(map);
-      }
+      if (!features?.length) return;
+      const props = Object.entries(features[0].properties || {})
+        .map(([k,v]) => `<div><strong>${k}</strong>: ${String(v)}</div>`).join("");
+      new maplibregl.Popup().setLngLat(e.lngLat).setHTML(props || "No properties").addTo(map);
     });
   </script>
 </body>
