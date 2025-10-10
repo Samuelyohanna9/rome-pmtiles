@@ -43,7 +43,6 @@
     const style = {
       version: 8,
       glyphs: "https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf",
-      // IMPORTANT: v4 sprite matches basemaps.js v5.x
       sprite: "https://protomaps.github.io/basemaps-assets/sprites/v4/light",
       sources: {
         [basemapSourceId]: {
@@ -52,11 +51,7 @@
           attribution: '<a href="https://protomaps.com">Protomaps</a> © <a href="https://openstreetmap.org">OpenStreetMap</a>'
         }
       },
-      // neutral background below everything + basemap layers
-      layers: [
-        { id: "background", type: "background", paint: { "background-color": "#f2f2f2" } },
-        ...basemaps.layers(basemapSourceId, basemaps.namedFlavor("light"), { lang: "en" })
-      ]
+      layers: basemaps.layers(basemapSourceId, basemaps.namedFlavor("light"), { lang: "en" })
     };
 
     // Initialize MapLibre
@@ -72,9 +67,6 @@
     map.addControl(new maplibregl.NavigationControl(), "top-right");
     map.addControl(new maplibregl.ScaleControl({ unit: "metric" }));
     map.addControl(new maplibregl.AttributionControl({ compact: true }));
-
-    // Log any load errors
-    map.on("error", (e) => console.error("Map error:", e?.error || e));
 
     // Helper: insert orthophoto beneath labels
     function firstSymbolLayerId() {
@@ -102,6 +94,19 @@
       document.getElementById("orthoToggle").onchange = (e) => {
         map.setLayoutProperty("naples-ortho", "visibility", e.target.checked ? "visible" : "none");
       };
+    });
+
+    // Optional: click to inspect vector features
+    map.on("error", (e) => console.error("Map error:", e && e.error ? e.error : e));
+    map.on("click", (e) => {
+      const features = map.queryRenderedFeatures(e.point);
+      if (features && features.length) {
+        const f = features[0];
+        const props = Object.entries(f.properties || {})
+          .map(([k, v]) => `<div><strong>${k}</strong>: ${String(v)}</div>`)
+          .join("");
+        new maplibregl.Popup().setLngLat(e.lngLat).setHTML(props || "No properties").addTo(map);
+      }
     });
   </script>
 </body>
