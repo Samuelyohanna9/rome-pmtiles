@@ -9,27 +9,24 @@
   <link href="./vendor/maplibre-gl.css" rel="stylesheet" />
 
   <style>
-    html, body, #map {
-      height: 100%;
-      margin: 0;
-      padding: 0;
-    }
+    html, body, #map { height: 100%; margin: 0; padding: 0; }
     .maplibregl-ctrl-attrib { font-size: 12px; }
-    .toggle-box {
-      position: absolute;
-      top: 10px; left: 10px; z-index: 1;
+    .panel {
+      position: absolute; top: 10px; left: 10px; z-index: 1;
       background: #fff; padding: 6px 8px; border-radius: 6px;
       font: 14px system-ui, sans-serif; box-shadow: 0 2px 8px rgba(0,0,0,.12);
+      display: flex; gap: 10px; align-items: center;
     }
+    button { cursor: pointer; }
   </style>
 </head>
 <body>
   <div id="map"></div>
 
-  <!-- Toggle control -->
-  <div class="toggle-box">
-    <input id="orthoToggle" type="checkbox" checked />
-    <label for="orthoToggle">Orthophoto</label>
+  <!-- Toggle + Zoom controls -->
+  <div class="panel">
+    <label><input id="orthoToggle" type="checkbox" checked /> Orthophoto</label>
+    <button id="zoomToOrtho" type="button">Zoom to orthophoto</button>
   </div>
 
   <!-- Local JS dependencies -->
@@ -43,12 +40,12 @@
     maplibregl.addProtocol("pmtiles", protocol.tile);
 
     // === YOUR PMTiles URLs ===
-    // Vector basemap (Naples subset) hosted on Supabase (make sure this file actually covers Naples).
+    // Vector basemap (Naples subset) on Supabase:
     const BASEMAP_RAW = "https://lvyaxudmgssqyxqmlyln.supabase.co/storage/v1/object/public/basemap/napoli_basemap.pmtiles";
-    // Raster orthophoto hosted on Cloudflare:
+    // Raster orthophoto (with alpha) on Cloudflare:
     const ORTHO_RAW   = "https://maps.greenspaces.cloud/Naples/part_of_napoli_orthopho_alpha.pmtiles";
 
-    // Register archives (helps some setups kick off fetching)
+    // Register archives (helps in some setups)
     protocol.add(new pmtiles.PMTiles(BASEMAP_RAW));
     protocol.add(new pmtiles.PMTiles(ORTHO_RAW));
 
@@ -75,7 +72,7 @@
     const map = new maplibregl.Map({
       container: "map",
       style,
-      center: [14.2681, 40.8518], // Naples
+      center: [14.2681, 40.8518], // temporary; we'll auto-fit to orthophoto
       zoom: 12,
       hash: true
     });
@@ -88,14 +85,31 @@
     // Helpful error logging
     map.on("error", (e) => console.error("Map error:", e?.error || e));
 
-    // Place orthophoto below the first label layer
+    // First symbol layer (so raster sits below labels)
     function firstSymbolLayerId() {
       const layers = map.getStyle().layers || [];
       for (const l of layers) if (l.type === "symbol") return l.id;
       return undefined;
     }
 
-    map.on("load", () => {
+    // Fit to orthophoto PMTiles bounds
+    async function fitToOrthoBounds() {
+      try {
+        const pmt = new pmtiles.PMTiles(ORTHO_RAW);
+        const header = await pmt.getHeader();
+        if (header?.bounds) {
+          const [w, s, e, n] = header.bounds;
+          // Guard against invalid bounds
+          if (isFinite(w) && isFinite(s) && isFinite(e) && isFinite(n) && w < e && s < n) {
+            map.fitBounds([[w, s], [e, n]], { padding: 24, maxZoom: 19 });
+          }
+        }
+      } catch (err) {
+        console.error("Could not read PMTiles header:", err);
+      }
+    }
+
+    map.on("load", async () => {
       // Raster orthophoto (PMTiles)
       map.addSource("naples-ortho", {
         type: "raster",
@@ -106,7 +120,14 @@
 
       const beforeId = firstSymbolLayerId();
       map.addLayer(
-        { id: "naples-ortho", type: "raster", source: "naples-ortho", minzoom: 0, maxzoom: 22 },
+        {
+          id: "naples-ortho",
+          type: "raster",
+          source: "naples-ortho",
+          minzoom: 0,
+          maxzoom: 22,
+          paint: { "raster-resampling": "linear", "raster-opacity": 1.0 }
+        },
         beforeId // insert under labels if available
       );
 
@@ -114,6 +135,21 @@
       document.getElementById("orthoToggle").onchange = (e) => {
         map.setLayoutProperty("naples-ortho", "visibility", e.target.checked ? "visible" : "none");
       };
+
+      // Button: zoom to orthophoto
+      document.getElementById("zoomToOrtho").onclick = fitToOrthoBounds;
+
+      // Auto-fit on first load
+      await fitToOrthoBounds();
+    });
+
+    // Optional: click to inspect vector features
+    map.on("click", (e) => {
+      const features = map.queryRenderedFeatures(e.point);
+      if (!features?.length) return;
+      const props = Object.entries(features[0].properties || {})
+        .map(([k,v]) => `<div><strong>${k}</strong>: ${String(v)}</div>`).join("");
+      new maplibregl.Popup().setLngLat(e.lngLat).setHTML(props || "No properties").addTo(map);
     });
   </script>
 </body>
