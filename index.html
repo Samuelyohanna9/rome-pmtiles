@@ -44,9 +44,9 @@
 
     // === YOUR PMTiles URLs ===
     // Vector basemap (Naples subset) hosted on Supabase (make sure this file actually covers Naples).
-    const BASEMAP_RAW = "https://lvyaxudmgssqyxqmlyln.supabase.co/storage/v1/object/public/basemap/Rome_basemap.pmtiles";
+    const BASEMAP_RAW = "https://lvyaxudmgssqyxqmlyln.supabase.co/storage/v1/object/public/basemap/napoli_basemap.pmtiles";
     // Raster orthophoto hosted on Cloudflare:
-    const ORTHO_RAW   = "https://maps.greenspaces.cloud/Naples/part_of_napoli_orthophoto.pmtiles";
+    const ORTHO_RAW   = "https://maps.greenspaces.cloud/Naples/part_of_napoli_orthopho_alpha.pmtiles";
 
     // Register archives (helps some setups kick off fetching)
     protocol.add(new pmtiles.PMTiles(BASEMAP_RAW));
