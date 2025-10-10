@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Rome PMTiles + Protomaps + MapLibre</title>
+  <title>Naples Orthophoto + Protomaps + MapLibre</title>
 
   <!-- Local MapLibre CSS -->
   <link href="./vendor/maplibre-gl.css" rel="stylesheet" />
@@ -17,12 +17,28 @@
     .maplibregl-ctrl-attrib {
       font-size: 12px;
     }
+    .toggle-box {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1;
+      background: #fff;
+      padding: 6px 8px;
+      border-radius: 6px;
+      font: 14px system-ui, sans-serif;
+    }
   </style>
 </head>
 <body>
   <div id="map"></div>
 
-  <!-- Local scripts -->
+  <!-- Toggle control -->
+  <div class="toggle-box">
+    <input id="orthoToggle" type="checkbox" checked />
+    <label for="orthoToggle">Orthophoto</label>
+  </div>
+
+  <!-- Local JS dependencies -->
   <script src="./vendor/maplibre-gl.js"></script>
   <script src="./vendor/pmtiles.js"></script>
   <script src="./vendor/basemaps.js"></script>
@@ -32,33 +48,31 @@
     const protocol = new pmtiles.Protocol();
     maplibregl.addProtocol("pmtiles", protocol.tile);
 
-    // Cloudflare R2 PMTiles URL
-const PMTILES_URL = "pmtiles://https://maps.greenspaces.cloud/Rome/Rome_basemap.pmtiles";
-const sourceId = "rome";
+    // Protomaps basemap (vector)
+    const BASEMAP_PM = "pmtiles://https://maps.greenspaces.cloud/Rome/Rome_basemap.pmtiles";
+    const basemapSourceId = "basemap";
 
-
-    // MapLibre style with Protomaps basemap layers
     const style = {
       version: 8,
       glyphs: "https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf",
       sprite: "https://protomaps.github.io/basemaps-assets/sprites/v4/light",
       sources: {
-        [sourceId]: {
+        [basemapSourceId]: {
           type: "vector",
-          url: PMTILES_URL,
+          url: BASEMAP_PM,
           attribution:
             '<a href="https://protomaps.com">Protomaps</a> © <a href="https://openstreetmap.org">OpenStreetMap</a>'
         }
       },
-      layers: basemaps.layers(sourceId, basemaps.namedFlavor("light"), { lang: "en" })
+      layers: basemaps.layers(basemapSourceId, basemaps.namedFlavor("light"), { lang: "en" })
     };
 
-    // Initialize map
+    // Initialize MapLibre
     const map = new maplibregl.Map({
       container: "map",
       style: style,
-      center: [12.4964, 41.9028], // Rome
-      zoom: 11,
+      center: [14.2681, 40.8518], // Naples
+      zoom: 12,
       hash: true
     });
 
@@ -67,7 +81,45 @@ const sourceId = "rome";
     map.addControl(new maplibregl.ScaleControl({ unit: "metric" }));
     map.addControl(new maplibregl.AttributionControl({ compact: true }));
 
-    // Optional: click to inspect features
+    // Helper
+    function firstSymbolLayerId() {
+      const layers = map.getStyle().layers || [];
+      for (const l of layers) if (l.type === "symbol") return l.id;
+      return undefined;
+    }
+
+    map.on("load", () => {
+      // Add Naples orthophoto raster PMTiles
+      map.addSource("naples-ortho", {
+        type: "raster",
+        url: "pmtiles://https://maps.greenspaces.cloud/Naples/part_of_napoli_orthophoto.pmtiles",
+        tileSize: 512,
+        attribution: "© Company Orthophoto"
+      });
+
+      const beforeId = firstSymbolLayerId();
+      map.addLayer(
+        {
+          id: "naples-ortho",
+          type: "raster",
+          source: "naples-ortho",
+          minzoom: 0,
+          maxzoom: 22
+        },
+        beforeId
+      );
+
+      // visibility
+      document.getElementById("orthoToggle").onchange = (e) => {
+        map.setLayoutProperty(
+          "naples-ortho",
+          "visibility",
+          e.target.checked ? "visible" : "none"
+        );
+      };
+    });
+
+    // inspect vector features
     map.on("click", (e) => {
       const features = map.queryRenderedFeatures(e.point);
       if (features && features.length) {
