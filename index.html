@@ -9,11 +9,23 @@
   <link href="./vendor/maplibre-gl.css" rel="stylesheet" />
 
   <style>
-    html, body, #map { height: 100%; margin: 0; padding: 0; }
-    .maplibregl-ctrl-attrib { font-size: 12px; }
+    html, body, #map {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    .maplibregl-ctrl-attrib {
+      font-size: 12px;
+    }
     .toggle-box {
-      position: absolute; top: 10px; left: 10px; z-index: 1;
-      background: #fff; padding: 6px 8px; border-radius: 6px; font: 14px system-ui, sans-serif;
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1;
+      background: #fff;
+      padding: 6px 8px;
+      border-radius: 6px;
+      font: 14px system-ui, sans-serif;
     }
   </style>
 </head>
@@ -36,8 +48,8 @@
     const protocol = new pmtiles.Protocol();
     maplibregl.addProtocol("pmtiles", protocol.tile);
 
-    // Global Protomaps basemap (vector PMTiles)
-    const BASEMAP_PM = "pmtiles://https://pmtiles.protomaps.com/20240401.pmtiles";
+    // Protomaps basemap (vector)
+    const BASEMAP_PM = "pmtiles://https://maps.greenspaces.cloud/Rome/Rome_basemap.pmtiles";
     const basemapSourceId = "basemap";
 
     const style = {
@@ -48,7 +60,8 @@
         [basemapSourceId]: {
           type: "vector",
           url: BASEMAP_PM,
-          attribution: '<a href="https://protomaps.com">Protomaps</a> © <a href="https://openstreetmap.org">OpenStreetMap</a>'
+          attribution:
+            '<a href="https://protomaps.com">Protomaps</a> © <a href="https://openstreetmap.org">OpenStreetMap</a>'
         }
       },
       layers: basemaps.layers(basemapSourceId, basemaps.namedFlavor("light"), { lang: "en" })
@@ -57,7 +70,7 @@
     // Initialize MapLibre
     const map = new maplibregl.Map({
       container: "map",
-      style,
+      style: style,
       center: [14.2681, 40.8518], // Naples
       zoom: 12,
       hash: true
@@ -68,7 +81,7 @@
     map.addControl(new maplibregl.ScaleControl({ unit: "metric" }));
     map.addControl(new maplibregl.AttributionControl({ compact: true }));
 
-    // Helper: insert orthophoto beneath labels
+    // Helper: find first symbol layer to insert orthophoto beneath labels
     function firstSymbolLayerId() {
       const layers = map.getStyle().layers || [];
       for (const l of layers) if (l.type === "symbol") return l.id;
@@ -76,7 +89,7 @@
     }
 
     map.on("load", () => {
-      // Naples orthophoto raster PMTiles (your file on Cloudflare)
+      // Add Naples orthophoto raster PMTiles
       map.addSource("naples-ortho", {
         type: "raster",
         url: "pmtiles://https://maps.greenspaces.cloud/Naples/part_of_napoli_orthophoto.pmtiles",
@@ -86,28 +99,40 @@
 
       const beforeId = firstSymbolLayerId();
       map.addLayer(
-        { id: "naples-ortho", type: "raster", source: "naples-ortho", minzoom: 0, maxzoom: 22 },
+        {
+          id: "naples-ortho",
+          type: "raster",
+          source: "naples-ortho",
+          minzoom: 0,
+          maxzoom: 22
+        },
         beforeId
       );
 
       // Toggle visibility
       document.getElementById("orthoToggle").onchange = (e) => {
-        map.setLayoutProperty("naples-ortho", "visibility", e.target.checked ? "visible" : "none");
+        map.setLayoutProperty(
+          "naples-ortho",
+          "visibility",
+          e.target.checked ? "visible" : "none"
+        );
       };
     });
 
     // Optional: click to inspect vector features
-    map.on("error", (e) => console.error("Map error:", e && e.error ? e.error : e));
     map.on("click", (e) => {
       const features = map.queryRenderedFeatures(e.point);
       if (features && features.length) {
         const f = features[0];
         const props = Object.entries(f.properties || {})
-          .map(([k, v]) => `<div><strong>${k}</strong>: ${String(v)}</div>`)
+          .map(([k,v]) => `<div><strong>${k}</strong>: ${String(v)}</div>`)
           .join("");
-        new maplibregl.Popup().setLngLat(e.lngLat).setHTML(props || "No properties").addTo(map);
+        new maplibregl.Popup()
+          .setLngLat(e.lngLat)
+          .setHTML(props || "No properties")
+          .addTo(map);
       }
     });
   </script>
 </body>
-</html>
+</html
